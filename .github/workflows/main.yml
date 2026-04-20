@@ -1,0 +1,79 @@
+name: Build Armbian for RK3399
+
+on:
+  workflow_dispatch:
+    inputs:
+      board:
+        description: ''
+        required: false
+        default: 'rockchip-rk3399'
+        type: string
+      release:
+        description: 'jammy=Ubuntu 22.04'
+        required: false
+        default: 'jammy'
+        type: choice
+        options:
+          - jammy
+          - focal
+          - bookworm
+          - bullseye
+      build_type:
+        description: 'minimal'
+        required: false
+        default: 'minimal'
+        type: choice
+        options:
+          - minimal
+          - standard
+          - full
+      kernel_branch:
+        description: 'current'
+        required: false
+        default: 'current'
+        type: choice
+        options:
+          - current
+          - edge
+          - legacy
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          docker system prune -af
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git libncurses5-dev libssl-dev \
+            make bison device-tree-compiler flex gcc-arm-none-eabi mtools python3 \
+            python3-pyelftools u-boot-tools
+
+      - name: Build Armbian
+        run: |
+          ./compile.sh \
+            BOARD="${{ github.event.inputs.board }}" \
+            BRANCH="${{ github.event.inputs.kernel_branch }}" \
+            RELEASE="${{ github.event.inputs.release }}" \
+            BUILD_MINIMAL="yes" \
+            BUILD_DESKTOP="no" \
+            KERNEL_CONFIGURE="no" \
+            COMPRESS_OUTPUTIMAGE="xz" \
+            KEEP_IMAGE="yes"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: armbian-image
+          path: output/images/*.xz
+          retention-days: 7
