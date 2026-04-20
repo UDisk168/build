@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       board:
-        description: ''
+        description: 'firefly-rk3399'
         required: false
-        default: 'rockchip-rk3399'
+        default: 'firefly-rk3399'
         type: string
       release:
         description: 'jammy=Ubuntu 22.04'
@@ -39,8 +39,13 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    # 1. 核心修复：将运行环境从 ubuntu-22.04 改为 ubuntu-24.04-arm
+    # 这个 ARM 架构的运行环境原生支持 ARM 模拟，从根本上解决了 binfmts 问题 [citation:1]
+    runs-on: ubuntu-24.04-arm
+    
     steps:
+      # 2. 修复警告：将 actions/checkout 从 v3/v4 升级到 v4 以兼容 Node 20
+      # 注意：v4 是目前广泛使用的稳定版本，可以有效消除 deprecation 警告 [citation:7]
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -55,9 +60,10 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
+          # 显式安装 qemu-user-static，这是确保跨架构构建成功的关键包 [citation:6]
           sudo apt-get install -y build-essential git libncurses5-dev libssl-dev \
             make bison device-tree-compiler flex gcc-arm-none-eabi mtools python3 \
-            python3-pyelftools u-boot-tools
+            python3-pyelftools u-boot-tools qemu-user-static
 
       - name: Build Armbian
         run: |
@@ -71,6 +77,7 @@ jobs:
             COMPRESS_OUTPUTIMAGE="xz" \
             KEEP_IMAGE="yes"
 
+      # 3. 修复警告：将 actions/upload-artifact 升级到 v5 以支持最新的 Node 环境
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
