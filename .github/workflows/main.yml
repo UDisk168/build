@@ -1,86 +1,31 @@
-name: Build Armbian for RK3399
+name: List Available RK3399 Boards
 
 on:
   workflow_dispatch:
-    inputs:
-      board:
-        description: 'rk3399-firefly'
-        required: false
-        default: 'firefly-rk3399'
-        type: string
-      release:
-        description: 'jammy=Ubuntu 22.04'
-        required: false
-        default: 'jammy'
-        type: choice
-        options:
-          - jammy
-          - focal
-          - bookworm
-          - bullseye
-      build_type:
-        description: 'minimal'
-        required: false
-        default: 'minimal'
-        type: choice
-        options:
-          - minimal
-          - standard
-          - full
-      kernel_branch:
-        description: 'current'
-        required: false
-        default: 'current'
-        type: choice
-        options:
-          - current
-          - edge
-          - legacy
 
 jobs:
-  build:
-    # 1. 核心修复：将运行环境从 ubuntu-22.04 改为 ubuntu-24.04-arm
-    # 这个 ARM 架构的运行环境原生支持 ARM 模拟，从根本上解决了 binfmts 问题 [citation:1]
+  list-boards:
     runs-on: ubuntu-24.04-arm
     
     steps:
-      # 2. 修复警告：将 actions/checkout 从 v3/v4 升级到 v4 以兼容 Node 20
-      # 注意：v4 是目前广泛使用的稳定版本，可以有效消除 deprecation 警告 [citation:7]
-      - name: Checkout code
+      - name: Checkout build framework
         uses: actions/checkout@v4
-
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/local/share/boost
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          docker system prune -af
+        with:
+          repository: armbian/build
+          path: build
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          # 显式安装 qemu-user-static，这是确保跨架构构建成功的关键包 [citation:6]
           sudo apt-get install -y build-essential git libncurses5-dev libssl-dev \
             make bison device-tree-compiler flex gcc-arm-none-eabi mtools python3 \
             python3-pyelftools u-boot-tools qemu-user-static
 
-      - name: Build Armbian
+      - name: List all boards
+        working-directory: ./build
         run: |
-          ./compile.sh \
-            BOARD="${{ github.event.inputs.board }}" \
-            BRANCH="${{ github.event.inputs.kernel_branch }}" \
-            RELEASE="${{ github.event.inputs.release }}" \
-            BUILD_MINIMAL="yes" \
-            BUILD_DESKTOP="no" \
-            KERNEL_CONFIGURE="no" \
-            COMPRESS_OUTPUTIMAGE="xz" \
-            KEEP_IMAGE="yes"
-
-      # 3. 修复警告：将 actions/upload-artifact 升级到 v5 以支持最新的 Node 环境
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: armbian-image
-          path: output/images/*.xz
-          retention-days: 7
+          echo "=== 所有可用的 RK3399 相关板卡 ==="
+          ./compile.sh list-boards 2>/dev/null | grep -i rk3399 || echo "未找到包含 rk3399 的板卡"
+          echo ""
+          echo "=== 所有 rockchip64 家族的板卡 ==="
+          ./compile.sh list-boards 2>/dev/null | grep -i rockchip64 || echo "未找到 rockchip64 板卡"
