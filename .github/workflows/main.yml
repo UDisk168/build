@@ -1,4 +1,6 @@
-name: Build Armbian for RK3399
+name: List available boards
+run: |
+  ./compile.sh list-boards | grep -i rk3399
 
 on:
   workflow_dispatch:
